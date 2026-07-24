@@ -1,0 +1,21 @@
+# Copy this file to terraform.tfvars and fill in your values.
+# terraform.tfvars is git-ignored by default — do NOT commit it.
+
+resource_group_name  = "azure-retirement-navigator-rg"
+location             = "eastus"
+function_app_name    = "azure-retirement-navigator"    # must be globally unique
+storage_account_name = "retirementnav0001"             # must be globally unique, 3-24 lowercase alphanumeric
+
+# Subscriptions whose Advisor retirement recommendations will be surfaced.
+# The Function App's managed identity is granted Reader on each subscription listed here.
+azure_subscription_ids = [
+  "00000000-0000-0000-0000-000000000000",
+]
+
+python_version     = "3.11"
+log_retention_days = 30
+
+tags = {
+  environment = "production"
+  project     = "azure-retirement-navigator"
+}

@@ -1,0 +1,426 @@
+﻿:root {
+    --navy: #081b33;
+    --navy-light: #123f6d;
+    --blue: #0f6cbd;
+    --blue-light: #eaf3fb;
+    --cyan: #52d6ff;
+    --background: #f4f7fb;
+    --surface: #ffffff;
+    --text: #17253a;
+    --muted: #607086;
+    --border: #dce5ef;
+    --warning-bg: #fff7df;
+    --warning-border: #d99b00;
+    --warning-text: #594500;
+    --danger-bg: #fde7e9;
+    --danger-text: #9d1d32;
+    --success-bg: #dff6dd;
+    --success-text: #0b6a0b;
+    --shadow: 0 5px 20px rgba(21, 42, 69, 0.08);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--background);
+    color: var(--text);
+    font-family:
+        "Segoe UI",
+        -apple-system,
+        BlinkMacSystemFont,
+        Arial,
+        sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.hero {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 42px max(5vw, 24px) 74px;
+    color: #ffffff;
+    background:
+        linear-gradient(
+            120deg,
+            var(--navy),
+            var(--navy-light)
+        );
+}
+
+.hero h1 {
+    margin: 3px 0;
+    font-size: 40px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+}
+
+.hero p {
+    max-width: 760px;
+    margin: 0;
+    color: #cfdeed;
+    font-size: 16px;
+}
+
+.eyebrow {
+    color: var(--cyan);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+}
+
+button {
+    min-width: 132px;
+    padding: 11px 18px;
+    border: 0;
+    border-radius: 8px;
+    background: #ffffff;
+    color: var(--blue);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #f2f7fb;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+a:focus-visible {
+    outline: 3px solid var(--cyan);
+    outline-offset: 2px;
+}
+
+main {
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 0 24px 32px;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-top: -48px;
+}
+
+.summary-card,
+.content-panel {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+.summary-card {
+    padding: 20px;
+}
+
+.summary-card span {
+    display: block;
+    color: var(--muted);
+}
+
+.summary-card strong {
+    display: block;
+    margin-top: 6px;
+    color: var(--text);
+    font-size: 28px;
+    font-weight: 650;
+}
+
+.content-panel {
+    margin-top: 20px;
+    padding: 22px;
+}
+
+.panel-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 18px;
+}
+
+.panel-heading h2 {
+    margin: 0;
+    font-size: 22px;
+}
+
+.panel-heading p {
+    margin: 4px 0 0;
+    color: var(--muted);
+}
+
+.freshness {
+    color: var(--muted);
+    font-size: 12px;
+    text-align: right;
+}
+
+.filter-grid {
+    display: grid;
+    grid-template-columns: 2fr repeat(5, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.filter-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.filter-grid label > span {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+input,
+select {
+    width: 100%;
+    min-height: 42px;
+    padding: 10px 11px;
+    border: 1px solid #bac7d6;
+    border-radius: 8px;
+    background: #ffffff;
+    color: var(--text);
+    font: inherit;
+}
+
+.coverage-notice {
+    margin: 18px 0;
+    padding: 12px 14px;
+    border-left: 4px solid var(--warning-border);
+    background: var(--warning-bg);
+    color: var(--warning-text);
+}
+
+.status-message {
+    padding: 34px;
+    color: var(--muted);
+    text-align: center;
+}
+
+.status-message.error {
+    color: var(--danger-text);
+}
+
+.retirement-cards {
+    display: grid;
+    gap: 14px;
+}
+
+.retirement-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 180px;
+    gap: 18px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+.retirement-card h3 {
+    margin: 0 0 8px;
+    font-size: 19px;
+    line-height: 1.3;
+}
+
+.card-description {
+    max-width: 1000px;
+    margin: 8px 0;
+    color: #34445a;
+}
+
+.pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin: 12px 0;
+}
+
+.pill {
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: var(--blue-light);
+    color: #174f7c;
+    font-size: 12px;
+}
+
+.pill.warning {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+}
+
+.pill.success {
+    background: var(--success-bg);
+    color: var(--success-text);
+}
+
+.deadline {
+    text-align: right;
+}
+
+.deadline-date {
+    display: block;
+    font-size: 17px;
+    font-weight: 650;
+}
+
+.days-remaining {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+}
+
+.impact-count {
+    display: block;
+    margin-top: 14px;
+    color: var(--blue);
+    font-size: 30px;
+    font-weight: 700;
+}
+
+.impact-caption {
+    color: var(--muted);
+}
+
+.details-link {
+    display: inline-block;
+    margin-top: 8px;
+    color: var(--blue);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.details-link:hover {
+    text-decoration: underline;
+}
+
+.resource-details {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.resource-details summary {
+    color: var(--blue);
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.resource-table {
+    width: 100%;
+    margin-top: 12px;
+    border-collapse: collapse;
+}
+
+.resource-table th,
+.resource-table td {
+    padding: 9px;
+    border-bottom: 1px solid #edf1f5;
+    text-align: left;
+    vertical-align: top;
+}
+
+.resource-table th {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.resource-id {
+    max-width: 600px;
+    overflow-wrap: anywhere;
+    font-family:
+        Consolas,
+        "Courier New",
+        monospace;
+    font-size: 12px;
+}
+
+footer {
+    padding: 18px 24px 28px;
+    color: var(--muted);
+    text-align: center;
+    font-size: 12px;
+}
+
+@media (max-width: 1200px) {
+    .filter-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    .hero {
+        align-items: flex-start;
+        padding-bottom: 42px;
+    }
+
+    .hero h1 {
+        font-size: 32px;
+    }
+
+    .summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+        margin-top: 20px;
+    }
+
+    .retirement-card {
+        grid-template-columns: 1fr;
+    }
+
+    .deadline {
+        text-align: left;
+    }
+
+    .resource-table,
+    .resource-table tbody,
+    .resource-table tr,
+    .resource-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .resource-table thead {
+        display: none;
+    }
+
+    .resource-table tr {
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .resource-table td {
+        border: 0;
+        padding: 3px 0;
+    }
+}
+
+@media (max-width: 650px) {
+    .hero {
+        flex-direction: column;
+    }
+
+    .summary-grid,
+    .filter-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .panel-heading {
+        flex-direction: column;
+    }
+
+    .freshness {
+        text-align: left;
+    }
+}

@@ -1,0 +1,36 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.python_packages/
+.pytest_cache/
+*.egg-info/
+
+# Local deployment artifacts
+deploy.zip
+deploy_src.zip
+.linux_wheels/
+
+# Azure Functions local settings (contains connection strings / secrets)
+local.settings.json
+
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Terraform state and local overrides
+infra/.terraform/
+infra/.terraform.lock.hcl
+infra/terraform.tfvars
+infra/tfplan
+infra/*.tfstate
+infra/*.tfstate.backup
+infra/crash.log
+
+# IDE / OS
+.vscode/settings.json
+.idea/
+.DS_Store
+Thumbs.db

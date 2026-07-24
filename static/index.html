@@ -1,0 +1,187 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>Azure Retirement Navigator</title>
+
+    <link rel="stylesheet" href="/styles.css">
+</head>
+
+<body>
+    <header class="hero">
+        <div>
+            <span class="eyebrow">
+                AZURE GOVERNANCE
+            </span>
+
+            <h1>
+                Retirement Navigator
+            </h1>
+
+            <p>
+                Review upcoming Azure service retirements
+                and identify affected resources across
+                configured subscriptions.
+            </p>
+        </div>
+
+        <button
+            id="refreshButton"
+            type="button"
+        >
+            Refresh data
+        </button>
+    </header>
+
+    <main>
+        <section
+            class="summary-grid"
+            aria-label="Retirement summary"
+        >
+            <article class="summary-card">
+                <span>Upcoming retirements</span>
+                <strong id="totalRetirements">—</strong>
+            </article>
+
+            <article class="summary-card">
+                <span>With identified impact</span>
+                <strong id="retirementsWithImpact">—</strong>
+            </article>
+
+            <article class="summary-card">
+                <span>Impacted resources</span>
+                <strong id="totalResources">—</strong>
+            </article>
+
+            <article class="summary-card">
+                <span>Next retirement date</span>
+                <strong id="nextDeadline">—</strong>
+            </article>
+        </section>
+
+        <section class="content-panel">
+            <div class="panel-heading">
+                <div>
+                    <h2>Retirement inventory</h2>
+
+                    <p>
+                        Filter by service, subscription,
+                        region, resource group, and impact.
+                    </p>
+                </div>
+
+                <span
+                    id="generatedAt"
+                    class="freshness"
+                ></span>
+            </div>
+
+            <div class="filter-grid">
+                <label>
+                    <span>Search</span>
+
+                    <input
+                        id="searchFilter"
+                        type="search"
+                        placeholder="Search service, resource, or guidance"
+                    >
+                </label>
+
+                <label>
+                    <span>Service</span>
+
+                    <select id="serviceFilter">
+                        <option value="">
+                            All services
+                        </option>
+                    </select>
+                </label>
+
+                <label>
+                    <span>Region</span>
+
+                    <select id="regionFilter">
+                        <option value="">
+                            All regions
+                        </option>
+                    </select>
+                </label>
+
+                <label>
+                    <span>Subscription</span>
+
+                    <select id="subscriptionFilter">
+                        <option value="">
+                            All subscriptions
+                        </option>
+                    </select>
+                </label>
+
+                <label>
+                    <span>Resource group</span>
+
+                    <select id="resourceGroupFilter">
+                        <option value="">
+                            All resource groups
+                        </option>
+                    </select>
+                </label>
+
+                <label>
+                    <span>Impact view</span>
+
+                    <select id="impactFilter">
+                        <option value="all">
+                            Show all retirements
+                        </option>
+
+                        <option value="impacted">
+                            Only identified impacted resources
+                        </option>
+
+                        <option value="analysis">
+                            Only where impact data is available
+                        </option>
+
+                        <option value="unavailable">
+                            Impact analysis unavailable
+                        </option>
+                    </select>
+                </label>
+            </div>
+
+            <div
+                id="coverageNotice"
+                class="coverage-notice"
+                role="note"
+            ></div>
+
+            <div
+                id="statusMessage"
+                class="status-message"
+            >
+                Loading Azure retirement data…
+            </div>
+
+            <div
+                id="retirementCards"
+                class="retirement-cards"
+            ></div>
+        </section>
+    </main>
+
+    <footer>
+        <span>
+            Data source: Azure Advisor and Azure Resource Graph
+        </span>
+    </footer>
+
+    <script src="/app.js"></script>
+</body>
+</html>
