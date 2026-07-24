@@ -64,21 +64,17 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       # ── Install Python dependencies on Linux (correct platform) ───────────
-      # ubuntu-latest is Linux x64 — packages are built for the same platform
-      # as the Azure Functions Linux Consumption host. No cross-compilation.
+      # Skipped — Oryx remote build installs packages server-side from
+      # requirements.txt when Kudu processes the zip. This means GitHub Actions
+      # only needs to upload source files, not compiled native packages.
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        run: |
-          pip install \
-            --target=".python_packages/lib/python3.11/site-packages" \
-            --no-cache-dir \
-            -r requirements.txt
-
       # ── Build deployment zip ───────────────────────────────────────────────
+      # Only source files — no pre-built packages. Oryx installs from
+      # requirements.txt server-side, so .python_packages/ is not needed.
       - name: Create deployment zip
         run: |
           zip -r $BLOB_NAME . \
@@ -87,28 +83,27 @@ jobs:
             --exclude ".github/*" \
             --exclude "*.zip" \
             --exclude ".venv/*" \
-            --exclude "venv/*"
+            --exclude "venv/*" \
+            --exclude ".python_packages/*"
           echo "Package size: $(du -sh $BLOB_NAME | cut -f1)"
 
       # ── Deploy zip via Kudu (SCM) using AAD Bearer-token auth ──────────────
-      # WEBSITE_RUN_FROM_PACKAGE=1 means Kudu stores the zip in the function
-      # app's managed-identity-backed storage. Kudu runs inside Azure so it
-      # bypasses the tenant policy that disables public network access on the
-      # storage account. When basic auth is disabled on SCM, Azure CLI
-      # automatically uses the OIDC service principal's ARM Bearer token.
+      # Oryx remote build runs server-side: Kudu receives the source zip,
+      # installs Python packages from requirements.txt inside Azure (bypasses
+      # publicNetworkAccess=Disabled on storage), then deploys to wwwroot.
+      # --build-remote is omitted so Oryx triggers automatically.
       - name: Deploy zip to function app
         run: |
           az functionapp deployment source config-zip \
             --resource-group "$RESOURCE_GROUP" \
             --name "$FUNCTION_APP_NAME" \
             --src "$BLOB_NAME" \
-            --build-remote false \
-            --timeout 120
+            --timeout 300
 
       # ── Smoke test ──────────────────────────────────────────────────────────
       - name: Smoke test health endpoint
         run: |
-          sleep 20  # allow cold start + package mount
+          sleep 60  # allow Oryx build + cold start
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             "https://${FUNCTION_APP_NAME}.azurewebsites.net/api/health")
           echo "Health: $STATUS"

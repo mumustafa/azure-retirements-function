@@ -82,11 +82,12 @@ resource "azurerm_linux_function_app" "func" {
     FUNCTIONS_WORKER_RUNTIME              = "python"
     AZURE_SUBSCRIPTION_IDS                = join(",", var.azure_subscription_ids)
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.ai.connection_string
-    # Run from the zip deployed via Kudu (SCM) using AAD Bearer-token auth.
-    # GitHub Actions deploys with `az functionapp deployment source config-zip`;
-    # Kudu (running inside Azure) writes the package to the managed-identity-backed
-    # storage, bypassing the tenant policy that disables public network access.
-    WEBSITE_RUN_FROM_PACKAGE              = "1"
+    # Oryx remote build: Kudu installs Python packages server-side from
+    # requirements.txt, bypassing the tenant policy that blocks public network
+    # access on the storage account. No WEBSITE_RUN_FROM_PACKAGE needed —
+    # files are deployed to /home/site/wwwroot via /api/zipdeploy.
+    ENABLE_ORYX_BUILD                     = "true"
+    SCM_DO_BUILD_DURING_DEPLOYMENT        = "true"
   }
 
   tags = var.tags
