@@ -6,9 +6,10 @@ on:
   workflow_dispatch:
 
 # Required for OIDC (keyless Azure login — no client secret needed).
+# contents:write is needed to publish/update the GitHub Release.
 permissions:
   id-token: write
-  contents: read
+  contents: write
 
 jobs:
   deploy:
@@ -64,17 +65,24 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       # ── Install Python dependencies on Linux (correct platform) ───────────
-      # Skipped — Oryx remote build installs packages server-side from
-      # requirements.txt when Kudu processes the zip. This means GitHub Actions
-      # only needs to upload source files, not compiled native packages.
+      # ubuntu-latest is Linux x64 — same platform as the Functions Linux
+      # Consumption host. Packages are pre-built here and shipped in the zip
+      # (no Oryx remote build needed with WEBSITE_RUN_FROM_PACKAGE=URL).
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      - name: Install dependencies
+        run: |
+          pip install \
+            --target=".python_packages/lib/python3.11/site-packages" \
+            --no-cache-dir \
+            -r requirements.txt
+
       # ── Build deployment zip ───────────────────────────────────────────────
-      # Only source files — no pre-built packages. Oryx installs from
-      # requirements.txt server-side, so .python_packages/ is not needed.
+      # Include pre-built .python_packages/ — function app runs directly from
+      # this zip (WEBSITE_RUN_FROM_PACKAGE=URL), no server-side build needed.
       - name: Create deployment zip
         run: |
           zip -r $BLOB_NAME . \
@@ -83,27 +91,43 @@ jobs:
             --exclude ".github/*" \
             --exclude "*.zip" \
             --exclude ".venv/*" \
-            --exclude "venv/*" \
-            --exclude ".python_packages/*"
+            --exclude "venv/*"
           echo "Package size: $(du -sh $BLOB_NAME | cut -f1)"
 
-      # ── Deploy zip via Kudu (SCM) using AAD Bearer-token auth ──────────────
-      # Oryx remote build runs server-side: Kudu receives the source zip,
-      # installs Python packages from requirements.txt inside Azure (bypasses
-      # publicNetworkAccess=Disabled on storage), then deploys to wwwroot.
-      # --build-remote is omitted so Oryx triggers automatically.
-      - name: Deploy zip to function app
+      # ── Publish zip to GitHub Releases (bypasses storage data-plane) ───────
+      # The function app reads WEBSITE_RUN_FROM_PACKAGE from a fixed GitHub
+      # Releases URL. Actions writes to GitHub (same network — no Azure
+      # storage involved). The URL is static; content is overwritten on each
+      # deploy; function restart forces a re-download.
+      # REQUIRES: repo must be public for anonymous download to work.
+      - name: Publish package to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          az functionapp deployment source config-zip \
-            --resource-group "$RESOURCE_GROUP" \
+          # Upload asset to fixed 'deployment' tag, overwriting previous asset.
+          if gh release view deployment --repo "${{ github.repository }}" &>/dev/null; then
+            gh release upload deployment "$BLOB_NAME" \
+              --repo "${{ github.repository }}" \
+              --clobber
+          else
+            gh release create deployment "$BLOB_NAME" \
+              --repo "${{ github.repository }}" \
+              --title "Latest Deployment" \
+              --notes "Automated deployment" \
+              --latest=false
+          fi
+
+      # ── Restart to pick up the new zip from GitHub Releases ──────────────
+      - name: Restart function app
+        run: |
+          az functionapp restart \
             --name "$FUNCTION_APP_NAME" \
-            --src "$BLOB_NAME" \
-            --timeout 300
+            --resource-group "$RESOURCE_GROUP"
 
       # ── Smoke test ──────────────────────────────────────────────────────────
       - name: Smoke test health endpoint
         run: |
-          sleep 60  # allow Oryx build + cold start
+          sleep 30  # allow cold start + GitHub package download
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             "https://${FUNCTION_APP_NAME}.azurewebsites.net/api/health")
           echo "Health: $STATUS"

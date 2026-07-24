@@ -82,12 +82,12 @@ resource "azurerm_linux_function_app" "func" {
     FUNCTIONS_WORKER_RUNTIME              = "python"
     AZURE_SUBSCRIPTION_IDS                = join(",", var.azure_subscription_ids)
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.ai.connection_string
-    # Oryx remote build: Kudu installs Python packages server-side from
-    # requirements.txt, bypassing the tenant policy that blocks public network
-    # access on the storage account. No WEBSITE_RUN_FROM_PACKAGE needed —
-    # files are deployed to /home/site/wwwroot via /api/zipdeploy.
-    ENABLE_ORYX_BUILD                     = "true"
-    SCM_DO_BUILD_DURING_DEPLOYMENT        = "true"
+    # Package URL sourced from GitHub Releases — GitHub Actions publishes to
+    # the fixed 'deployment' tag; the function app downloads this zip on every
+    # cold start. GitHub is reachable from Azure outbound; no storage data-plane
+    # access needed, bypassing the tenant publicNetworkAccess=Disabled policy.
+    # NOTE: repo must be public so the URL is anonymously downloadable.
+    WEBSITE_RUN_FROM_PACKAGE              = "https://github.com/mumustafa/azure-retirements-function/releases/download/deployment/function-app.zip"
   }
 
   tags = var.tags
