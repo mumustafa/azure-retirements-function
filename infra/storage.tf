@@ -8,7 +8,10 @@ resource "azurerm_storage_account" "func_storage" {
   min_tls_version                 = "TLS1_2"
   allow_nested_items_to_be_public = false
   # Reflects the tenant policy — key-based auth is not permitted.
-  shared_access_key_enabled = false
+  shared_access_key_enabled       = false
+  # Tenant policy enforces this. Kudu (running inside Azure) uses the
+  # AzureServices bypass so the function app and SCM deploys still work.
+  public_network_access_enabled   = false
 
   tags = var.tags
 }

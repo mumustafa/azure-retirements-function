@@ -63,6 +63,10 @@ resource "azurerm_linux_function_app" "func" {
     azurerm_role_assignment.func_storage_table_contributor,
   ]
 
+  # Disable all basic-auth publish paths (policy requirement).
+  ftp_publish_basic_authentication_enabled       = false
+  webdeploy_publish_basic_authentication_enabled = false
+
   site_config {
     application_stack {
       python_version = var.python_version
@@ -78,10 +82,11 @@ resource "azurerm_linux_function_app" "func" {
     FUNCTIONS_WORKER_RUNTIME              = "python"
     AZURE_SUBSCRIPTION_IDS                = join(",", var.azure_subscription_ids)
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.ai.connection_string
-    # Run from package blob — the function app reads this zip using its managed
-    # identity (Storage Blob Data Owner assigned to both system and user identities).
-    # GitHub Actions writes a new zip here on every push to main; restart picks it up.
-    WEBSITE_RUN_FROM_PACKAGE              = "https://${azurerm_storage_account.func_storage.name}.blob.core.windows.net/deployments/function-app.zip"
+    # Run from the zip deployed via Kudu (SCM) using AAD Bearer-token auth.
+    # GitHub Actions deploys with `az functionapp deployment source config-zip`;
+    # Kudu (running inside Azure) writes the package to the managed-identity-backed
+    # storage, bypassing the tenant policy that disables public network access.
+    WEBSITE_RUN_FROM_PACKAGE              = "1"
   }
 
   tags = var.tags

@@ -90,25 +90,20 @@ jobs:
             --exclude "venv/*"
           echo "Package size: $(du -sh $BLOB_NAME | cut -f1)"
 
-      # ── Upload package to blob storage (ARM-token auth, no basic auth) ─────
-      # The function app reads this blob at startup using its managed identity
-      # (Storage Blob Data Owner assigned to both system and user-assigned ids).
-      - name: Upload package to blob storage
+      # ── Deploy zip via Kudu (SCM) using AAD Bearer-token auth ──────────────
+      # WEBSITE_RUN_FROM_PACKAGE=1 means Kudu stores the zip in the function
+      # app's managed-identity-backed storage. Kudu runs inside Azure so it
+      # bypasses the tenant policy that disables public network access on the
+      # storage account. When basic auth is disabled on SCM, Azure CLI
+      # automatically uses the OIDC service principal's ARM Bearer token.
+      - name: Deploy zip to function app
         run: |
-          az storage blob upload \
-            --account-name "$STORAGE_ACCOUNT" \
-            --container-name "$BLOB_CONTAINER" \
-            --file "$BLOB_NAME" \
-            --name "$BLOB_NAME" \
-            --auth-mode login \
-            --overwrite
-
-      # ── Restart to pick up the new package ────────────────────────────────
-      - name: Restart function app
-        run: |
-          az functionapp restart \
+          az functionapp deployment source config-zip \
+            --resource-group "$RESOURCE_GROUP" \
             --name "$FUNCTION_APP_NAME" \
-            --resource-group "$RESOURCE_GROUP"
+            --src "$BLOB_NAME" \
+            --build-remote false \
+            --timeout 120
 
       # ── Smoke test ──────────────────────────────────────────────────────────
       - name: Smoke test health endpoint
