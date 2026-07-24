@@ -11,22 +11,17 @@ variable "location" {
 }
 
 variable "function_app_name" {
-  description = "Name of the Azure Function App. Must be globally unique."
-  type        = string
-}
-
-variable "storage_account_name" {
-  description = "Name of the storage account used by the Functions runtime. Must be globally unique, 3–24 lowercase alphanumeric characters."
+  description = "Name of the App Service. Must be globally unique (used as the azurewebsites.net hostname)."
   type        = string
 }
 
 variable "azure_subscription_ids" {
-  description = "List of Azure subscription IDs to query for retirement data. The Function App's managed identity is granted Reader on each."
+  description = "List of Azure subscription IDs to query for retirement data. The App Service's managed identity is granted Reader on each."
   type        = list(string)
 }
 
 variable "python_version" {
-  description = "Python runtime version for the Function App."
+  description = "Python runtime version for the App Service."
   type        = string
   default     = "3.11"
 }
@@ -42,3 +37,4 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+

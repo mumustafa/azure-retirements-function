@@ -1,15 +1,15 @@
-name: Deploy to Azure Functions
+name: Deploy to Azure App Service
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-# Required for OIDC (keyless Azure login — no client secret needed).
-# contents:write is needed to publish/update the GitHub Release.
+# id-token:write — OIDC token for keyless Azure login.
+# contents:read  — checkout only, no GitHub Releases needed.
 permissions:
   id-token: write
-  contents: write
+  contents: read
 
 jobs:
   deploy:
@@ -17,46 +17,12 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      FUNCTION_APP_NAME: azure-retirement-navigator
+      APP_NAME: azure-retirement-navigator
       RESOURCE_GROUP: azure-retirement-navigator-rg
-      STORAGE_ACCOUNT: retirementnav0001
-      BLOB_CONTAINER: deployments
-      BLOB_NAME: function-app.zip
 
     steps:
       - uses: actions/checkout@v4
 
-      # ── Azure login via OIDC (Workload Identity Federation) ───────────────
-      # No client secret stored — uses short-lived federated tokens.
-      #
-      # One-time setup (run from your local machine, replace OWNER/REPO):
-      #
-      #   APP_ID=$(az ad app create --display-name "github-retirement-deploy" --query appId -o tsv)
-      #   az ad sp create --id $APP_ID
-      #   OBJ_ID=$(az ad sp show --id $APP_ID --query id -o tsv)
-      #
-      #   # Federated credential for pushes to main
-      #   az ad app federated-credential create --id $APP_ID --parameters '{
-      #     "name": "github-main",
-      #     "issuer": "https://token.actions.githubusercontent.com",
-      #     "subject": "repo:mumustafa/azure-retirements-function:ref:refs/heads/main",
-      #     "audiences": ["api://AzureADTokenExchange"]
-      #   }'
-      #
-      #   # Contributor on resource group (for app settings update + restart)
-      #   az role assignment create --role Contributor \
-      #     --assignee $OBJ_ID \
-      #     --scope /subscriptions/29455385-3bf0-4542-85c6-df996ffa3004/resourceGroups/azure-retirement-navigator-rg
-      #
-      #   # Storage Blob Data Contributor on storage account (for blob upload)
-      #   az role assignment create --role "Storage Blob Data Contributor" \
-      #     --assignee $OBJ_ID \
-      #     --scope /subscriptions/29455385-3bf0-4542-85c6-df996ffa3004/resourceGroups/azure-retirement-navigator-rg/providers/Microsoft.Storage/storageAccounts/retirementnav0001
-      #
-      # GitHub secrets to create (Settings → Secrets → Actions):
-      #   AZURE_CLIENT_ID       = $APP_ID
-      #   AZURE_TENANT_ID       = $(az account show --query tenantId -o tsv)
-      #   AZURE_SUBSCRIPTION_ID = 29455385-3bf0-4542-85c6-df996ffa3004
       - name: Azure Login (OIDC)
         uses: azure/login@v2
         with:
@@ -64,72 +30,37 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      # ── Install Python dependencies on Linux (correct platform) ───────────
-      # ubuntu-latest is Linux x64 — same platform as the Functions Linux
-      # Consumption host. Packages are pre-built here and shipped in the zip
-      # (no Oryx remote build needed with WEBSITE_RUN_FROM_PACKAGE=URL).
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: |
-          pip install \
-            --target=".python_packages/lib/site-packages" \
-            --no-cache-dir \
-            -r requirements.txt
-
       # ── Build deployment zip ───────────────────────────────────────────────
-      # Include pre-built .python_packages/ — function app runs directly from
-      # this zip (WEBSITE_RUN_FROM_PACKAGE=URL), no server-side build needed.
+      # Source-only zip — Oryx installs packages server-side during deploy
+      # (SCM_DO_BUILD_DURING_DEPLOYMENT=true set in Terraform app_settings).
       - name: Create deployment zip
         run: |
-          zip -r $BLOB_NAME . \
+          zip -r app.zip . \
             --exclude "infra/*" \
             --exclude ".git/*" \
             --exclude ".github/*" \
             --exclude "*.zip" \
             --exclude ".venv/*" \
-            --exclude "venv/*"
-          echo "Package size: $(du -sh $BLOB_NAME | cut -f1)"
+            --exclude "venv/*" \
+            --exclude ".python_packages/*"
+          echo "Package size: $(du -sh app.zip | cut -f1)"
 
-      # ── Publish zip to GitHub Releases (bypasses storage data-plane) ───────
-      # The function app reads WEBSITE_RUN_FROM_PACKAGE from a fixed GitHub
-      # Releases URL. Actions writes to GitHub (same network — no Azure
-      # storage involved). The URL is static; content is overwritten on each
-      # deploy; function restart forces a re-download.
-      # REQUIRES: repo must be public for anonymous download to work.
-      - name: Publish package to GitHub Releases
-        env:
-          GH_TOKEN: ${{ github.token }}
+      # ── Deploy ─────────────────────────────────────────────────────────────
+      # az webapp deploy triggers an Oryx build (pip install), then restarts.
+      - name: Deploy to App Service
         run: |
-          # Upload asset to fixed 'deployment' tag, overwriting previous asset.
-          if gh release view deployment --repo "${{ github.repository }}" &>/dev/null; then
-            gh release upload deployment "$BLOB_NAME" \
-              --repo "${{ github.repository }}" \
-              --clobber
-          else
-            gh release create deployment "$BLOB_NAME" \
-              --repo "${{ github.repository }}" \
-              --title "Latest Deployment" \
-              --notes "Automated deployment" \
-              --latest=false
-          fi
-
-      # ── Restart to pick up the new zip from GitHub Releases ──────────────
-      - name: Restart function app
-        run: |
-          az functionapp restart \
-            --name "$FUNCTION_APP_NAME" \
-            --resource-group "$RESOURCE_GROUP"
+          az webapp deploy \
+            --name "$APP_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --src-path app.zip \
+            --type zip
 
       # ── Smoke test ──────────────────────────────────────────────────────────
       - name: Smoke test health endpoint
         run: |
-          sleep 30  # allow cold start + GitHub package download
+          sleep 60
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            "https://${FUNCTION_APP_NAME}.azurewebsites.net/api/health")
+            "https://${APP_NAME}.azurewebsites.net/api/health")
           echo "Health: $STATUS"
           if [[ "$STATUS" != "200" ]]; then
             echo "Health check failed with HTTP $STATUS"

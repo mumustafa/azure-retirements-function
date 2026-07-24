@@ -1,25 +1,4 @@
-resource "azurerm_storage_account" "func_storage" {
-  name                     = var.storage_account_name
-  resource_group_name      = azurerm_resource_group.rg.name
-  location                 = azurerm_resource_group.rg.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
+# Storage account removed — App Service (B1) does not require a dedicated
+# storage account for its runtime, eliminating the publicNetworkAccess=Disabled
+# policy conflict that permanently blocked the Functions Consumption plan.
 
-  min_tls_version                 = "TLS1_2"
-  allow_nested_items_to_be_public = false
-  # Reflects the tenant policy — key-based auth is not permitted.
-  shared_access_key_enabled       = false
-  # Tenant policy enforces this. Kudu (running inside Azure) uses the
-  # AzureServices bypass so the function app and SCM deploys still work.
-  public_network_access_enabled   = false
-
-  tags = var.tags
-}
-
-# Private container for deployment packages (WEBSITE_RUN_FROM_PACKAGE).
-# The function app reads from this container using its managed identity.
-resource "azurerm_storage_container" "deployments" {
-  name                  = "deployments"
-  storage_account_id    = azurerm_storage_account.func_storage.id
-  container_access_type = "private"
-}
