@@ -76,7 +76,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install \
-            --target=".python_packages/lib/python3.11/site-packages" \
+            --target=".python_packages/lib/site-packages" \
             --no-cache-dir \
             -r requirements.txt
 
