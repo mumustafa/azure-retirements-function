@@ -227,11 +227,13 @@ managed_identity_principal_id = "<guid>"
 
 ### 3 — Create the GitHub OIDC app registration
 
-The CI/CD pipeline authenticates to Azure without any stored password or client secret — it uses OpenID Connect (OIDC) Workload Identity Federation.
+The CI/CD pipeline authenticates to Azure without any stored password or client secret — it uses OpenID Connect (OIDC) Workload Identity Federation. See the [CI/CD Authentication deep-dive](#cicd-authentication--workload-identity-federation) section below for the full picture of what was configured and why.
+
+**Quick path via CLI:**
 
 ```bash
-# Create the app registration
-az ad app create --display-name "azure-retirement-navigator-ghactions"
+# Create the app registration (this project uses: github-retirement-deploy)
+az ad app create --display-name "github-retirement-deploy"
 
 # Note the appId from the output, then create a service principal
 az ad sp create --id <appId>
@@ -253,7 +255,7 @@ az ad app federated-credential create \
   }'
 ```
 
-> Adjust `subject` if your repository path or branch name differs.
+> **If using the Entra portal UI instead of the CLI**, the federated credential wizard asks for the GitHub Organization/User ID and Repository ID as immutable numeric identifiers — not the names. See the [dedicated section](#cicd-authentication--workload-identity-federation) for how to retrieve them.
 
 ### 4 — Add GitHub repository secrets
 
@@ -422,3 +424,129 @@ Returns the full retirement dataset. Response is JSON with `Cache-Control: priva
 ### `GET /api/health`
 
 Returns `{"status":"ok","timestamp":"..."}` with HTTP 200. Used by the CI/CD smoke test and any external health monitoring. `Cache-Control: no-store`.
+
+---
+
+## CI/CD Authentication — Workload Identity Federation
+
+This section documents exactly what was configured to allow GitHub Actions to deploy to Azure without storing any secret, password, or certificate.
+
+### What and why
+
+Traditional CI/CD setups store a long-lived client secret in GitHub. If that secret leaks, an attacker has persistent access to your Azure resources until the secret is manually rotated.
+
+**Workload Identity Federation** (WIF) eliminates stored secrets entirely. Instead:
+
+1. GitHub generates a short-lived, cryptographically signed **OIDC token** for each workflow run.
+2. Azure verifies that token against the federated credential rules you configured.
+3. If the token is valid (correct org, repo, branch), Azure issues a short-lived access token for that run only.
+4. No secret is ever stored anywhere.
+
+```
+GitHub Actions Runner
+        │
+        │  Short-lived OIDC token (signed by GitHub's JWKS)
+        ▼
+Microsoft Entra ID
+  - Validates token against the Federated Credential
+  - Checks issuer, subject (org/repo/branch), and audience
+        │
+        │  Short-lived Azure access token (valid ~1 hour)
+        ▼
+Azure Resource Group: azure-retirement-navigator-rg
+```
+
+### What was created
+
+#### Entra App Registration
+
+| Field | Value |
+|-------|-------|
+| Display name | `github-retirement-deploy` |
+| Type | App registration (single-tenant) |
+| Created via | Microsoft Entra portal |
+
+The app registration represents the deployment identity. It has no password or certificate — authentication is exclusively through the federated credential below.
+
+#### Federated Credential
+
+| Field | Value |
+|-------|-------|
+| Issuer | `https://token.actions.githubusercontent.com` |
+| Organisation | `mumustafa` |
+| Repository | `azure-retirements-function` |
+| Branch | `main` |
+| Audience | `api://AzureADTokenExchange` |
+
+The credential is scoped to the `main` branch of this specific repository. A workflow run on any other branch, fork, or repository cannot obtain a token.
+
+#### RBAC assignments on the app registration
+
+| Role | Scope | Purpose |
+|------|-------|---------|
+| Contributor | `azure-retirement-navigator-rg` | Allows `az webapp deploy` to push code and update app settings |
+| Storage Blob Data Contributor | `retirementnav0001` | Allows deployment package upload to the storage account used during the initial Functions-based setup phase |
+
+### GitHub repository secrets
+
+Three secrets are required in **Settings → Secrets and variables → Actions**:
+
+| Secret | Where to find it |
+|--------|-----------------|
+| `AZURE_CLIENT_ID` | App registration overview → Application (client) ID |
+| `AZURE_TENANT_ID` | Entra portal → Overview → Tenant ID, or `az account show --query tenantId` |
+| `AZURE_SUBSCRIPTION_ID` | Subscription where the App Service lives |
+
+These are not secrets in the traditional sense — they are IDs, not credentials. The security guarantee comes from the federated credential, not the secrecy of these values. They are stored as GitHub secrets purely to avoid hardcoding subscription-specific values in the workflow file.
+
+### How the workflow uses them
+
+```yaml
+permissions:
+  id-token: write   # Required — allows the runner to request an OIDC token from GitHub
+  contents: read
+
+- name: Azure Login (OIDC)
+  uses: azure/login@v2.3.0
+  with:
+    client-id: ${{ secrets.AZURE_CLIENT_ID }}
+    tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+```
+
+`id-token: write` is the critical permission. Without it, GitHub will not issue an OIDC token to the runner and the login step fails with a cryptic "Unable to get OIDC token" error.
+
+### Key lesson: the Entra portal UI requires numeric GitHub IDs
+
+The Microsoft Entra portal's **"Add a credential"** wizard (as of 2026) validates the federated credential using GitHub's **immutable numeric identifiers**, not the display names. If you configure this through the portal UI rather than the CLI, you need:
+
+- **GitHub User/Organization ID** — the numeric account ID, not the username
+- **GitHub Repository ID** — the numeric repo ID, not `owner/repo-name`
+
+These IDs are permanent and survive renames. They are retrieved from the GitHub REST API:
+
+```
+# Get your GitHub user/org numeric ID
+GET https://api.github.com/users/mumustafa
+→ look for "id" field
+
+# Get the repository numeric ID
+GET https://api.github.com/repos/mumustafa/azure-retirements-function
+→ look for "id" field
+```
+
+You can open these URLs directly in a browser — no authentication required for public repositories. Copy the `id` values and paste them into the Entra portal wizard.
+
+> **Why does this matter?** If you type the username or repo name in the portal fields and they are silently converted to names (not IDs), your federated credential may appear to save successfully but fail at runtime with an "AADSTS70021: No matching federated identity record found" error. Always verify the credential was saved with the numeric IDs, not strings.
+
+### Security properties of this setup
+
+| Property | Status |
+|----------|--------|
+| No stored client secret | ✅ |
+| No stored certificate | ✅ |
+| Tokens auto-expire (never need rotation) | ✅ |
+| Scoped to single branch (`main`) | ✅ |
+| Scoped to single repository | ✅ |
+| Contributor scoped to resource group only (not subscription) | ✅ |
+| `id-token: write` explicitly declared in workflow | ✅ |
