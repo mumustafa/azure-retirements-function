@@ -75,7 +75,7 @@ advisorresources
         =~ "ServiceUpgradeAndRetirement"
 | extend
     resourceId =
-        tostring(properties.resourceMetadata.resourceId),
+        tolower(tostring(properties.resourceMetadata.resourceId)),
     recommendationTypeId =
         coalesce(
             tostring(properties.recommendationTypeId),
@@ -101,14 +101,33 @@ advisorresources
 | join kind=leftouter (
     resources
     | project
-        resourceId = id,
+        resourceId = tolower(id),
         resourceName = name,
         resourceType = type,
         region = location,
-        resourceGroup,
-        subscriptionId,
-        tags
+        joinedResourceGroup = resourceGroup,
+        joinedSubscriptionId = subscriptionId,
+        resourceTags = tags
 ) on resourceId
+| extend
+    resourceName = coalesce(
+        resourceName,
+        tostring(split(resourceId, '/')[-1])
+    ),
+    resourceType = coalesce(
+        resourceType,
+        iff(
+            array_length(split(resourceId, '/')) >= 9,
+            strcat(
+                tostring(split(resourceId, '/')[6]),
+                '/',
+                tostring(split(resourceId, '/')[7])
+            ),
+            ''
+        )
+    ),
+    resourceGroup = coalesce(joinedResourceGroup, resourceGroup),
+    subscriptionId = coalesce(joinedSubscriptionId, subscriptionId)
 | project
     recommendationId = id,
     recommendationTypeId,
@@ -124,7 +143,7 @@ advisorresources
     region,
     resourceGroup,
     subscriptionId,
-    tags
+    tags = resourceTags
 """
 
 
