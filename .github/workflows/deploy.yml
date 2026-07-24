@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Azure Login (OIDC)
-        uses: azure/login@v2
+        uses: azure/login@v2.3.0
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -46,23 +46,33 @@ jobs:
           echo "Package size: $(du -sh app.zip | cut -f1)"
 
       # ── Deploy ─────────────────────────────────────────────────────────────
-      # az webapp deploy triggers an Oryx build (pip install), then restarts.
+      # --async true: fire-and-forget. Oryx build + startup takes ~4-5 min
+      # which exceeds az webapp deploy's 10-min startup wait; the smoke test
+      # below handles readiness polling instead.
       - name: Deploy to App Service
         run: |
           az webapp deploy \
             --name "$APP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
             --src-path app.zip \
-            --type zip
+            --type zip \
+            --async true
 
       # ── Smoke test ──────────────────────────────────────────────────────────
+      # Retry every 30 s for up to 10 min (20 attempts) — accounts for the
+      # ~3-min Oryx pip-install + container restart time.
       - name: Smoke test health endpoint
         run: |
-          sleep 60
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            "https://${APP_NAME}.azurewebsites.net/api/health")
-          echo "Health: $STATUS"
-          if [[ "$STATUS" != "200" ]]; then
-            echo "Health check failed with HTTP $STATUS"
-            exit 1
-          fi
+          echo "Polling health endpoint (Oryx build + startup takes ~4 min)..."
+          for i in $(seq 1 20); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://${APP_NAME}.azurewebsites.net/api/health" 2>/dev/null || echo "000")
+            echo "Attempt $i/20: HTTP $STATUS"
+            if [[ "$STATUS" == "200" ]]; then
+              echo "Health check passed"
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "Health check failed after 10 minutes"
+          exit 1
